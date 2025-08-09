@@ -1,0 +1,14 @@
+name: memoria_editor_custom
+description: Jeu d'édition 2D/2.5D/3D (éditeur de jeu) sans références externes.
+publish_to: "none"
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  desktop_multi_window: ^0.2.0
+
+flutter:
+  uses-material-design: true
