@@ -1,3 +1,5 @@
+enum CameraMode { twoD, twoPointFiveD, threeD }
+
 enum MapLayerKind { layerA, layerB, layerC, layerD, events }
 
 class MapData {

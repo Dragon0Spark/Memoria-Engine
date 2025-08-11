@@ -4,10 +4,11 @@ import 'package:flutter/services.dart';
 import 'models.dart';
 
 class RuntimePreviewPage extends StatefulWidget {
-  const RuntimePreviewPage({super.key, required this.mapData, required this.scene});
+  const RuntimePreviewPage({super.key, required this.mapData, required this.scene, required this.cameraMode});
 
   final MapData mapData;
   final SceneData scene;
+  final CameraMode cameraMode;
 
   @override
   State<RuntimePreviewPage> createState() => _RuntimePreviewPageState();
@@ -128,13 +129,14 @@ class _RuntimePreviewPageState extends State<RuntimePreviewPage> {
           children: [
             Center(
               child: CustomPaint(
-                size: Size(map.width * tileSize, map.height * tileSize),
+                size: _canvasSize(map.width, map.height, widget.cameraMode),
                 painter: _RuntimePainter(
                   mapData: map,
                   tileSize: tileSize,
                   playerX: playerX,
                   playerY: playerY,
                   scene: widget.scene,
+                  cameraMode: widget.cameraMode,
                 ),
               ),
             ),
@@ -159,6 +161,17 @@ class _RuntimePreviewPageState extends State<RuntimePreviewPage> {
       ),
     );
   }
+
+  Size _canvasSize(int w, int h, CameraMode mode) {
+    if (mode == CameraMode.twoPointFiveD) {
+      final double tileW = tileSize * 2;
+      final double tileH = tileSize;
+      final width = (w + h) * (tileW / 2) + tileW * 2;
+      final height = (w + h) * (tileH / 2) + tileH * 3;
+      return Size(width, height);
+    }
+    return Size(w * tileSize, h * tileSize);
+  }
 }
 
 class _RuntimePainter extends CustomPainter {
@@ -168,6 +181,7 @@ class _RuntimePainter extends CustomPainter {
     required this.playerX,
     required this.playerY,
     required this.scene,
+    required this.cameraMode,
   });
 
   final MapData mapData;
@@ -175,6 +189,7 @@ class _RuntimePainter extends CustomPainter {
   final int playerX;
   final int playerY;
   final SceneData scene;
+  final CameraMode cameraMode;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -189,37 +204,127 @@ class _RuntimePainter extends CustomPainter {
       }
     }
 
-    // draw layers
-    void paintLayer(TileLayer layer, Color color) {
+    if (cameraMode == CameraMode.twoD) {
+      void paintLayer(TileLayer layer, Color color) {
+        for (int y = 0; y < layer.height; y++) {
+          for (int x = 0; x < layer.width; x++) {
+            final t = layer.data[y][x];
+            if (t < 0) continue;
+            final r = Rect.fromLTWH(x * tileSize, y * tileSize, tileSize, tileSize);
+            canvas.drawRRect(RRect.fromRectAndRadius(r, const Radius.circular(2)), Paint()..color = color.withOpacity(0.35));
+          }
+        }
+      }
+      paintLayer(mapData.layers[MapLayerKind.layerA]!, const Color(0xFF64B5F6));
+      paintLayer(mapData.layers[MapLayerKind.layerB]!, const Color(0xFF81C784));
+      paintLayer(mapData.layers[MapLayerKind.layerC]!, const Color(0xFFA1887F));
+      paintLayer(mapData.layers[MapLayerKind.layerD]!, const Color(0xFFBA68C8));
+      for (final o in scene.objects) {
+        final rect = Rect.fromLTWH(o.x * tileSize, o.y * tileSize, tileSize, tileSize);
+        final paint = Paint()..color = Colors.orangeAccent.withOpacity(0.9);
+        canvas.drawRRect(RRect.fromRectAndRadius(rect.deflate(3), const Radius.circular(4)), paint);
+      }
+      final playerCenter = Offset((playerX + 0.5) * tileSize, (playerY + 0.5) * tileSize);
+      canvas.drawCircle(playerCenter, tileSize * 0.35, Paint()..color = Colors.white);
+      canvas.drawCircle(playerCenter, tileSize * 0.35, Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2
+        ..color = Colors.black54);
+      return;
+    }
+
+    if (cameraMode == CameraMode.twoPointFiveD) {
+      final double tileW = tileSize * 2;
+      final double tileH = tileSize;
+      final originX = (mapData.height * (tileW / 2)) + tileW;
+      final originY = tileH;
+      void paintLayerIso(TileLayer layer, Color color) {
+        for (int y = 0; y < layer.height; y++) {
+          for (int x = 0; x < layer.width; x++) {
+            final t = layer.data[y][x];
+            if (t < 0) continue;
+            final c = _isoProject(x, y, tileW, tileH, originX, originY);
+            final path = Path()
+              ..moveTo(c.dx, c.dy - tileH / 2)
+              ..lineTo(c.dx + tileW / 2, c.dy)
+              ..lineTo(c.dx, c.dy + tileH / 2)
+              ..lineTo(c.dx - tileW / 2, c.dy)
+              ..close();
+            canvas.drawPath(path, Paint()..color = color.withOpacity(0.4));
+          }
+        }
+      }
+      paintLayerIso(mapData.layers[MapLayerKind.layerA]!, const Color(0xFF64B5F6));
+      paintLayerIso(mapData.layers[MapLayerKind.layerB]!, const Color(0xFF81C784));
+      paintLayerIso(mapData.layers[MapLayerKind.layerC]!, const Color(0xFFA1887F));
+      paintLayerIso(mapData.layers[MapLayerKind.layerD]!, const Color(0xFFBA68C8));
+
+      final drawList = List<SceneObject>.from(scene.objects)
+        ..sort((a, b) => (a.y != b.y) ? a.y.compareTo(b.y) : a.x.compareTo(b.x));
+      for (final o in drawList) {
+        final c = _isoProject(o.x, o.y, tileW, tileH, originX, originY);
+        final path = Path()
+          ..moveTo(c.dx, c.dy - tileH / 2)
+          ..lineTo(c.dx + tileW / 2, c.dy)
+          ..lineTo(c.dx, c.dy + tileH / 2)
+          ..lineTo(c.dx - tileW / 2, c.dy)
+          ..close();
+        canvas.drawPath(path, Paint()..color = Colors.orangeAccent.withOpacity(0.9));
+      }
+
+      final pc = _isoProject(playerX, playerY, tileW, tileH, originX, originY).translate(0, -tileH * 0.1);
+      canvas.drawCircle(pc, tileSize * 0.35, Paint()..color = Colors.white);
+      canvas.drawCircle(pc, tileSize * 0.35, Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2
+        ..color = Colors.black54);
+      return;
+    }
+
+    // Pseudo-3D
+    final double tileW = tileSize * 2.4;
+    final double tileH = tileSize * 1.2;
+    final originX = (mapData.height * (tileW / 2)) + tileW;
+    final originY = tileH * 1.5;
+    void paintLayerPersp(TileLayer layer, Color color) {
       for (int y = 0; y < layer.height; y++) {
         for (int x = 0; x < layer.width; x++) {
           final t = layer.data[y][x];
           if (t < 0) continue;
-          final r = Rect.fromLTWH(x * tileSize, y * tileSize, tileSize, tileSize);
-          canvas.drawRRect(RRect.fromRectAndRadius(r, const Radius.circular(2)), Paint()..color = color.withOpacity(0.35));
+          final c = _isoProject(x, y, tileW, tileH, originX, originY);
+          final rect = Rect.fromCenter(center: c, width: tileW, height: tileH);
+          canvas.drawRRect(RRect.fromRectAndRadius(rect, const Radius.circular(3)), Paint()..color = color.withOpacity(0.35));
         }
       }
     }
+    paintLayerPersp(mapData.layers[MapLayerKind.layerA]!, const Color(0xFF64B5F6));
+    paintLayerPersp(mapData.layers[MapLayerKind.layerB]!, const Color(0xFF81C784));
+    paintLayerPersp(mapData.layers[MapLayerKind.layerC]!, const Color(0xFFA1887F));
+    paintLayerPersp(mapData.layers[MapLayerKind.layerD]!, const Color(0xFFBA68C8));
 
-    paintLayer(mapData.layers[MapLayerKind.layerA]!, const Color(0xFF64B5F6));
-    paintLayer(mapData.layers[MapLayerKind.layerB]!, const Color(0xFF81C784));
-    paintLayer(mapData.layers[MapLayerKind.layerC]!, const Color(0xFFA1887F));
-    paintLayer(mapData.layers[MapLayerKind.layerD]!, const Color(0xFFBA68C8));
-
-    // draw scene objects
-    for (final o in scene.objects) {
-      final rect = Rect.fromLTWH(o.x * tileSize, o.y * tileSize, tileSize, tileSize);
-      final paint = Paint()..color = Colors.orangeAccent.withOpacity(0.9);
-      canvas.drawRRect(RRect.fromRectAndRadius(rect.deflate(3), const Radius.circular(4)), paint);
+    final drawList = List<SceneObject>.from(scene.objects)
+      ..sort((a, b) => (a.y != b.y) ? a.y.compareTo(b.y) : a.x.compareTo(b.x));
+    for (final o in drawList) {
+      final base = _isoProject(o.x, o.y, tileW, tileH, originX, originY);
+      final top = base.translate(0, -tileSize * 0.8);
+      canvas.drawLine(base, top, Paint()
+        ..color = Colors.orangeAccent
+        ..strokeWidth = 6
+        ..strokeCap = StrokeCap.round);
     }
 
-    // draw player
-    final playerCenter = Offset((playerX + 0.5) * tileSize, (playerY + 0.5) * tileSize);
-    canvas.drawCircle(playerCenter, tileSize * 0.35, Paint()..color = Colors.white);
-    canvas.drawCircle(playerCenter, tileSize * 0.35, Paint()
+    final pc = _isoProject(playerX, playerY, tileW, tileH, originX, originY).translate(0, -tileSize * 0.8);
+    canvas.drawCircle(pc, tileSize * 0.35, Paint()..color = Colors.white);
+    canvas.drawCircle(pc, tileSize * 0.35, Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2
       ..color = Colors.black54);
+  }
+
+  Offset _isoProject(int x, int y, double tileW, double tileH, double originX, double originY) {
+    final screenX = (x - y) * (tileW / 2) + originX;
+    final screenY = (x + y) * (tileH / 2) + originY;
+    return Offset(screenX, screenY);
   }
 
   @override
@@ -227,6 +332,7 @@ class _RuntimePainter extends CustomPainter {
     return oldDelegate.mapData != mapData ||
         oldDelegate.playerX != playerX ||
         oldDelegate.playerY != playerY ||
-        oldDelegate.scene != scene;
+        oldDelegate.scene != scene ||
+        oldDelegate.cameraMode != cameraMode;
   }
 }

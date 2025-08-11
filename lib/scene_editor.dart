@@ -7,14 +7,14 @@ class SceneEditorPage extends StatefulWidget {
     super.key,
     required this.scene,
     required this.mapData,
-    required this.is3D,
+    required this.cameraMode,
     this.pendingAssetName,
     this.onPendingAssetConsumed,
   });
 
   final SceneData scene;
   final MapData mapData;
-  final bool is3D;
+  final CameraMode cameraMode;
   final String? pendingAssetName;
   final VoidCallback? onPendingAssetConsumed;
 
@@ -34,7 +34,7 @@ class _SceneEditorPageState extends State<SceneEditorPage> {
   Widget build(BuildContext context) {
     final scene = widget.scene;
     final map = widget.mapData;
-    final Size canvasSize = Size(map.width * tileSize, map.height * tileSize);
+    final Size canvasSize = _computeCanvasSize(map.width, map.height, widget.cameraMode);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -60,7 +60,7 @@ class _SceneEditorPageState extends State<SceneEditorPage> {
                       tileSize: tileSize,
                       objects: scene.objects,
                       selectedObjectId: selectedObjectId,
-                      is3D: widget.is3D,
+                      cameraMode: widget.cameraMode,
                     ),
                   ),
                 ),
@@ -70,6 +70,18 @@ class _SceneEditorPageState extends State<SceneEditorPage> {
         ),
       ],
     );
+  }
+
+  Size _computeCanvasSize(int w, int h, CameraMode mode) {
+    if (mode == CameraMode.twoPointFiveD) {
+      final double tileW = tileSize * 2;
+      final double tileH = tileSize;
+      final width = (w + h) * (tileW / 2) + tileW * 2;
+      final height = (w + h) * (tileH / 2) + tileH * 3;
+      return Size(width, height);
+    }
+    // 2D and 3D fallback to a planar canvas
+    return Size(w * tileSize, h * tileSize);
   }
 
   Widget _buildToolbar() {
@@ -131,6 +143,7 @@ class _SceneEditorPageState extends State<SceneEditorPage> {
 
   void _onPanUpdate(Offset localPos) {
     if (selectedObjectId == null || dragStartWorld == null) return;
+    // For simplicity, use planar delta in grid space even in iso/3D modes
     final dx = (localPos.dx - dragStartWorld!.dx) / tileSize;
     final dy = (localPos.dy - dragStartWorld!.dy) / tileSize;
     final obj = widget.scene.objects.firstWhere((o) => o.id == selectedObjectId);
@@ -147,6 +160,12 @@ class _SceneEditorPageState extends State<SceneEditorPage> {
   }
 
   Offset _pixelToGrid(Offset p) {
+    if (widget.cameraMode == CameraMode.twoPointFiveD) {
+      // Approximate inverse mapping by planar tiles for simplicity
+      final gx = (p.dx / tileSize).floor().toDouble();
+      final gy = (p.dy / tileSize).floor().toDouble();
+      return Offset(gx, gy);
+    }
     final gx = (p.dx / tileSize).floor().toDouble();
     final gy = (p.dy / tileSize).floor().toDouble();
     return Offset(gx, gy);
@@ -188,7 +207,7 @@ class _ScenePainter extends CustomPainter {
     required this.tileSize,
     required this.objects,
     required this.selectedObjectId,
-    required this.is3D,
+    required this.cameraMode,
   });
 
   final int mapWidth;
@@ -196,11 +215,16 @@ class _ScenePainter extends CustomPainter {
   final double tileSize;
   final List<SceneObject> objects;
   final String? selectedObjectId;
-  final bool is3D;
+  final CameraMode cameraMode;
 
   @override
   void paint(Canvas canvas, Size size) {
-    // Checker background
+    _paintBackground(canvas, size);
+    _paintGrid(canvas, size);
+    _paintObjects(canvas);
+  }
+
+  void _paintBackground(Canvas canvas, Size size) {
     final bgA = Paint()..color = const Color(0xFF153B6F);
     final bgB = Paint()..color = const Color(0xFF0F2F59);
     for (double y = 0; y < size.height; y += tileSize) {
@@ -209,34 +233,136 @@ class _ScenePainter extends CustomPainter {
         canvas.drawRect(Rect.fromLTWH(x, y, tileSize, tileSize), isA ? bgA : bgB);
       }
     }
+  }
 
-    // Grid
-    final gridPaint = Paint()
-      ..color = Colors.white12
+  void _paintGrid(Canvas canvas, Size size) {
+    if (cameraMode == CameraMode.twoD) {
+      final gridPaint = Paint()
+        ..color = Colors.white12
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1;
+      for (int x = 0; x <= mapWidth; x++) {
+        final dx = x * tileSize;
+        canvas.drawLine(Offset(dx, 0), Offset(dx, mapHeight * tileSize), gridPaint);
+      }
+      for (int y = 0; y <= mapHeight; y++) {
+        final dy = y * tileSize;
+        canvas.drawLine(Offset(0, dy), Offset(mapWidth * tileSize, dy), gridPaint);
+      }
+      return;
+    }
+
+    if (cameraMode == CameraMode.twoPointFiveD) {
+      final double tileW = tileSize * 2;
+      final double tileH = tileSize;
+      final originX = (mapHeight * (tileW / 2)) + tileW;
+      final originY = tileH;
+      final stroke = Paint()
+        ..color = Colors.white24
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1;
+      for (int y = 0; y < mapHeight; y++) {
+        for (int x = 0; x < mapWidth; x++) {
+          final center = _isoProject(x, y, tileW, tileH, originX, originY);
+          final path = Path();
+          path.moveTo(center.dx, center.dy - tileH / 2);
+          path.lineTo(center.dx + tileW / 2, center.dy);
+          path.lineTo(center.dx, center.dy + tileH / 2);
+          path.lineTo(center.dx - tileW / 2, center.dy);
+          path.close();
+          canvas.drawPath(path, stroke);
+        }
+      }
+      return;
+    }
+
+    // Pseudo-3D: draw a faint perspective-like grid using iso projection as a stand-in
+    final double tileW = tileSize * 2.4;
+    final double tileH = tileSize * 1.2;
+    final originX = (mapHeight * (tileW / 2)) + tileW;
+    final originY = tileH * 1.5;
+    final stroke = Paint()
+      ..color = Colors.white24
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1;
-    for (int x = 0; x <= mapWidth; x++) {
-      final dx = x * tileSize;
-      canvas.drawLine(Offset(dx, 0), Offset(dx, mapHeight * tileSize), gridPaint);
-    }
-    for (int y = 0; y <= mapHeight; y++) {
-      final dy = y * tileSize;
-      canvas.drawLine(Offset(0, dy), Offset(mapWidth * tileSize, dy), gridPaint);
-    }
-
-    // Draw objects
-    for (final o in objects) {
-      final rect = Rect.fromLTWH(o.x * tileSize, o.y * tileSize, tileSize, tileSize);
-      final color = _colorFor(o);
-      final rrect = RRect.fromRectAndRadius(rect.deflate(3), const Radius.circular(4));
-      canvas.drawRRect(rrect, Paint()..color = color);
-      if (o.id == selectedObjectId) {
-        canvas.drawRRect(rrect, Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 2
-          ..color = Colors.yellowAccent);
+    for (int y = 0; y < mapHeight; y++) {
+      for (int x = 0; x < mapWidth; x++) {
+        final center = _isoProject(x, y, tileW, tileH, originX, originY);
+        final rect = Rect.fromCenter(center: center, width: tileW, height: tileH);
+        canvas.drawRRect(RRect.fromRectAndRadius(rect, const Radius.circular(3)), stroke);
       }
     }
+  }
+
+  void _paintObjects(Canvas canvas) {
+    if (cameraMode == CameraMode.twoD) {
+      for (final o in objects) {
+        final rect = Rect.fromLTWH(o.x * tileSize, o.y * tileSize, tileSize, tileSize);
+        final color = _colorFor(o);
+        final rrect = RRect.fromRectAndRadius(rect.deflate(3), const Radius.circular(4));
+        canvas.drawRRect(rrect, Paint()..color = color);
+        if (o.id == selectedObjectId) {
+          canvas.drawRRect(rrect, Paint()
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 2
+            ..color = Colors.yellowAccent);
+        }
+      }
+      return;
+    }
+
+    final drawList = List<SceneObject>.from(objects)
+      ..sort((a, b) => (a.y != b.y) ? a.y.compareTo(b.y) : a.x.compareTo(b.x));
+
+    if (cameraMode == CameraMode.twoPointFiveD) {
+      final double tileW = tileSize * 2;
+      final double tileH = tileSize;
+      final originX = (mapHeight * (tileW / 2)) + tileW;
+      final originY = tileH;
+      for (final o in drawList) {
+        final c = _isoProject(o.x, o.y, tileW, tileH, originX, originY);
+        final path = Path();
+        path.moveTo(c.dx, c.dy - tileH / 2);
+        path.lineTo(c.dx + tileW / 2, c.dy);
+        path.lineTo(c.dx, c.dy + tileH / 2);
+        path.lineTo(c.dx - tileW / 2, c.dy);
+        path.close();
+        canvas.drawPath(path, Paint()..color = _colorFor(o).withOpacity(0.9));
+        if (o.id == selectedObjectId) {
+          canvas.drawPath(path, Paint()
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 2
+            ..color = Colors.yellowAccent);
+        }
+      }
+      return;
+    }
+
+    // Pseudo-3D: draw a small vertical extrusion
+    final double tileW = tileSize * 2.4;
+    final double tileH = tileSize * 1.2;
+    final originX = (mapHeight * (tileW / 2)) + tileW;
+    final originY = tileH * 1.5;
+    for (final o in drawList) {
+      final base = _isoProject(o.x, o.y, tileW, tileH, originX, originY);
+      final top = base.translate(0, -tileSize * 0.8);
+      final paint = Paint()..color = _colorFor(o).withOpacity(0.95);
+      // draw column
+      canvas.drawLine(base, top, Paint()
+        ..color = paint.color
+        ..strokeWidth = 6
+        ..strokeCap = StrokeCap.round);
+      // highlight selection
+      if (o.id == selectedObjectId) {
+        canvas.drawCircle(top, 6, Paint()..color = Colors.yellowAccent);
+      }
+    }
+  }
+
+  Offset _isoProject(int x, int y, double tileW, double tileH, double originX, double originY) {
+    final screenX = (x - y) * (tileW / 2) + originX;
+    final screenY = (x + y) * (tileH / 2) + originY;
+    return Offset(screenX, screenY);
   }
 
   Color _colorFor(SceneObject o) {
@@ -261,6 +387,6 @@ class _ScenePainter extends CustomPainter {
         oldDelegate.selectedObjectId != selectedObjectId ||
         oldDelegate.mapWidth != mapWidth ||
         oldDelegate.mapHeight != mapHeight ||
-        oldDelegate.is3D != is3D;
+        oldDelegate.cameraMode != cameraMode;
   }
 }
