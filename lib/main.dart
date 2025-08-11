@@ -8,6 +8,8 @@ import 'package:flutter/material.dart';
 import 'package:desktop_multi_window/desktop_multi_window.dart' as dmw;
 import 'map_editor.dart';
 import 'models.dart';
+import 'scene_editor.dart';
+import 'runtime.dart';
 
 /// Modes de caméra disponibles pour les vues 2D/2,5D/3D.
 enum CameraMode { twoD, twoPointFiveD, threeD }
@@ -155,9 +157,16 @@ class _MainWindowState extends State<MainWindow> {
   // Objets placés dans la scène (nom uniquement).
      final List<String> placed = [];
    final Map<String, MapData> _mapNameToData = {};
+   final Map<String, SceneData> _mapNameToScene = {};
+   int editorTabIndex = 0; // 0: Carte, 1: Scène
+   String? pendingAssetToPlace;
 
    MapData _ensureMapData(String name) {
      return _mapNameToData.putIfAbsent(name, () => MapData(name: name, width: 50, height: 30));
+   }
+
+   SceneData _ensureSceneData(String name) {
+     return _mapNameToScene.putIfAbsent(name, () => SceneData(name: name));
    }
 
   @override
@@ -255,7 +264,7 @@ class _MainWindowState extends State<MainWindow> {
                       camera: camera,
                       twoD: twoDAssets,
                       threeD: threeDAssets,
-                      onUse: (name) => setState(() => placed.add(name)),
+                      onUse: (name) => setState(() { pendingAssetToPlace = name; editorTabIndex = 1; }),
                     ),
                   ),
                 ),
@@ -266,7 +275,38 @@ class _MainWindowState extends State<MainWindow> {
                      Expanded(
              child: Column(
                children: [
-                 _SectionHeader(label: 'Scène (${maps[selectedMapIndex]['name']})'),
+                 _SectionHeader(label: 'Édition — ${maps[selectedMapIndex]['name']}'),
+                 Container(
+                   color: const Color(0xFF0F2F59),
+                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                   child: Row(
+                     children: [
+                       SegmentedButton<int>(
+                         segments: const [
+                           ButtonSegment<int>(value: 0, label: Text('Carte')),
+                           ButtonSegment<int>(value: 1, label: Text('Scène')),
+                         ],
+                         selected: {editorTabIndex},
+                         onSelectionChanged: (s) => setState(() => editorTabIndex = s.first),
+                       ),
+                       const SizedBox(width: 12),
+                       FilledButton.icon(
+                         onPressed: () {
+                           final name = maps[selectedMapIndex]['name'] as String;
+                           final mapData = _ensureMapData(name);
+                           final sceneData = _ensureSceneData(name);
+                           Navigator.of(context).push(
+                             MaterialPageRoute(
+                               builder: (_) => RuntimePreviewPage(mapData: mapData, scene: sceneData),
+                             ),
+                           );
+                         },
+                         icon: const Icon(Icons.play_arrow),
+                         label: const Text('Jouer'),
+                       ),
+                     ],
+                   ),
+                 ),
                  Expanded(
                    child: Container(
                      decoration: const BoxDecoration(
@@ -276,9 +316,17 @@ class _MainWindowState extends State<MainWindow> {
                          end: Alignment.bottomRight,
                        ),
                      ),
-                     child: MapEditorPage(
-                       mapData: _ensureMapData(maps[selectedMapIndex]['name'] as String),
-                     ),
+                     child: editorTabIndex == 0
+                         ? MapEditorPage(
+                             mapData: _ensureMapData(maps[selectedMapIndex]['name'] as String),
+                           )
+                         : SceneEditorPage(
+                             scene: _ensureSceneData(maps[selectedMapIndex]['name'] as String),
+                             mapData: _ensureMapData(maps[selectedMapIndex]['name'] as String),
+                             is3D: (maps[selectedMapIndex]['mode'] as CameraMode) == CameraMode.threeD,
+                             pendingAssetName: pendingAssetToPlace,
+                             onPendingAssetConsumed: () => setState(() => pendingAssetToPlace = null),
+                           ),
                    ),
                  ),
                 Container(
@@ -286,8 +334,10 @@ class _MainWindowState extends State<MainWindow> {
                   color: const Color(0xFF1E6CB8),
                   alignment: Alignment.centerLeft,
                   padding: const EdgeInsets.symmetric(horizontal: 12),
-                  child: const Text('Statut : prêt',
-                      style: TextStyle(color: Colors.white)),
+                  child: Text(
+                    'Statut : ${pendingAssetToPlace != null ? 'Placement en attente: $pendingAssetToPlace' : 'prêt'}',
+                    style: const TextStyle(color: Colors.white),
+                  ),
                 ),
               ],
             ),

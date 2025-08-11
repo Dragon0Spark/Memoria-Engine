@@ -52,3 +52,42 @@ class EventCommand {
   String code; // e.g., 'ShowText', 'ControlSwitch', 'TransferPlayer'
   final Map<String, dynamic> params;
 }
+
+// Scene editor models
+
+enum SceneObjectKind { sprite2D, model3D, light, camera, sound }
+
+class SceneObject {
+  SceneObject({
+    required this.id,
+    required this.name,
+    required this.kind,
+    required this.x,
+    required this.y,
+    this.asset = '',
+    Map<String, dynamic>? props,
+  }) : props = props ?? <String, dynamic>{};
+
+  String id;
+  String name;
+  SceneObjectKind kind;
+  int x;
+  int y;
+  String asset;
+  final Map<String, dynamic> props;
+}
+
+class SceneData {
+  SceneData({required this.name, List<SceneObject>? objects})
+      : objects = objects ?? <SceneObject>[];
+
+  String name;
+  final List<SceneObject> objects;
+
+  SceneObject? findObjectAt(int x, int y) {
+    for (final obj in objects) {
+      if (obj.x == x && obj.y == y) return obj;
+    }
+    return null;
+  }
+}
