@@ -11,8 +11,7 @@ import 'models.dart';
 import 'scene_editor.dart';
 import 'runtime.dart';
 
-/// Modes de caméra disponibles pour les vues 2D/2,5D/3D.
-enum CameraMode { twoD, twoPointFiveD, threeD }
+// CameraMode is now defined in models.dart
 
 /// Représente une statistique de base définie par l'utilisateur ou par défaut.
 class StatDef {
@@ -297,7 +296,11 @@ class _MainWindowState extends State<MainWindow> {
                            final sceneData = _ensureSceneData(name);
                            Navigator.of(context).push(
                              MaterialPageRoute(
-                               builder: (_) => RuntimePreviewPage(mapData: mapData, scene: sceneData),
+                               builder: (_) => RuntimePreviewPage(
+                                 mapData: mapData,
+                                 scene: sceneData,
+                                 cameraMode: (maps[selectedMapIndex]['mode'] as CameraMode),
+                               ),
                              ),
                            );
                          },
@@ -323,7 +326,7 @@ class _MainWindowState extends State<MainWindow> {
                          : SceneEditorPage(
                              scene: _ensureSceneData(maps[selectedMapIndex]['name'] as String),
                              mapData: _ensureMapData(maps[selectedMapIndex]['name'] as String),
-                             is3D: (maps[selectedMapIndex]['mode'] as CameraMode) == CameraMode.threeD,
+                             cameraMode: (maps[selectedMapIndex]['mode'] as CameraMode),
                              pendingAssetName: pendingAssetToPlace,
                              onPendingAssetConsumed: () => setState(() => pendingAssetToPlace = null),
                            ),
