@@ -6,6 +6,8 @@ import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:desktop_multi_window/desktop_multi_window.dart' as dmw;
+import 'map_editor.dart';
+import 'models.dart';
 
 /// Modes de caméra disponibles pour les vues 2D/2,5D/3D.
 enum CameraMode { twoD, twoPointFiveD, threeD }
@@ -151,7 +153,12 @@ class _MainWindowState extends State<MainWindow> {
     'Muzzle.vfx': AssetKind3D.vfx,
   };
   // Objets placés dans la scène (nom uniquement).
-  final List<String> placed = [];
+     final List<String> placed = [];
+   final Map<String, MapData> _mapNameToData = {};
+
+   MapData _ensureMapData(String name) {
+     return _mapNameToData.putIfAbsent(name, () => MapData(name: name, width: 50, height: 30));
+   }
 
   @override
   Widget build(BuildContext context) {
@@ -256,48 +263,24 @@ class _MainWindowState extends State<MainWindow> {
             ),
           ),
           const VerticalDivider(width: 1),
-          Expanded(
-            child: Column(
-              children: [
-                _SectionHeader(label: 'Scène (${maps[selectedMapIndex]['name']})'),
-                Expanded(
-                  child: Container(
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [Color(0xFF0B3D75), Color(0xFF05284D)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                    ),
-                    child: Stack(
-                      children: [
-                        CustomPaint(painter: _CheckerPainter()),
-                        Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text('Mode : ${describeEnum(camera)}',
-                                  style: const TextStyle(color: Colors.white70)),
-                              const SizedBox(height: 6),
-                              Text(
-                                camera == CameraMode.threeD
-                                    ? 'Placez uniquement des assets 3D'
-                                    : 'Placez uniquement des assets 2D',
-                                style: const TextStyle(color: Colors.white54),
-                              ),
-                              const SizedBox(height: 20),
-                              Wrap(
-                                spacing: 8,
-                                children:
-                                    placed.map((e) => Chip(label: Text(e))).toList(),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+                     Expanded(
+             child: Column(
+               children: [
+                 _SectionHeader(label: 'Scène (${maps[selectedMapIndex]['name']})'),
+                 Expanded(
+                   child: Container(
+                     decoration: const BoxDecoration(
+                       gradient: LinearGradient(
+                         colors: [Color(0xFF0B3D75), Color(0xFF05284D)],
+                         begin: Alignment.topLeft,
+                         end: Alignment.bottomRight,
+                       ),
+                     ),
+                     child: MapEditorPage(
+                       mapData: _ensureMapData(maps[selectedMapIndex]['name'] as String),
+                     ),
+                   ),
+                 ),
                 Container(
                   height: 26,
                   color: const Color(0xFF1E6CB8),
