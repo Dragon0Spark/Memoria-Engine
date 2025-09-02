@@ -1,17 +1,11 @@
-# Memoria_Engine
+# Memoria Engine
 
-A new Flutter project.
+Prototype d'éditeur inspiré de RPG Maker VX Ace développé avec Flutter.
 
-## Getting Started
+## Caractéristiques
 
-This project is a starting point for a Flutter application.
+- Édition de cartes et de scènes en 2D, 2,5D et 3D.
+- Base de données pour gérer héros, ennemis, tilesets, objets, compétences, états et statistiques.
+- Support des projectiles et désormais des animations d'acteur et VFX.
 
-A few resources to get you started if this is your first Flutter project:
-
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
-"# Memoria-Engine" 
+Ce projet est en cours de développement et sert de terrain d'expérimentation.
