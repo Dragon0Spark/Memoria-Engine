@@ -41,6 +41,22 @@ class ProjectileDef {
       {this.twoDAsset = '', this.threeDAsset = '', this.speed = 10, this.gravity = 0});
 }
 
+/// Animation utilisée pour les déplacements ou actions d'un personnage.
+class ActorAnimationDef {
+  final String name;
+  String asset2D;
+  String asset3D;
+  ActorAnimationDef(this.name, {this.asset2D = '', this.asset3D = ''});
+}
+
+/// Animation d'effet visuel (VFX) compatible 2D et 3D.
+class VfxAnimationDef {
+  final String name;
+  String asset2D;
+  String asset3D;
+  VfxAnimationDef(this.name, {this.asset2D = '', this.asset3D = ''});
+}
+
 /// Définit un personnage (héros ou ennemi) avec statistiques, résistances et états appliqués.
 class EntityDef {
   String name;
@@ -414,6 +430,8 @@ class _DatabaseWindowState extends State<DatabaseWindow> {
       _DbTab('Système', Icons.settings_outlined, const SystemTab()),
       _DbTab('Stats', Icons.bar_chart, const StatsDesignerTab()),
       _DbTab('Projectiles', Icons.bolt_outlined, const ProjectilesTab()),
+      _DbTab('Anim. Acteur', Icons.directions_run, const ActorAnimationsTab()),
+      _DbTab('Anim. VFX', Icons.auto_awesome, const VfxAnimationsTab()),
       _DbTab('Template', Icons.file_copy_outlined, const TemplateTab()),
     ];
     return DefaultTabController(
@@ -1156,6 +1174,176 @@ class _ProjectilesTabState extends State<ProjectilesTab> {
                     },
                     icon: const Icon(Icons.save_outlined),
                     label: const Text('Enregistrer le projectile'),
+                  ),
+                ],
+              ),
+            ),
+          )),
+        ),
+      ],
+    );
+  }
+}
+
+class ActorAnimationsTab extends StatefulWidget {
+  const ActorAnimationsTab({super.key});
+  @override
+  State<ActorAnimationsTab> createState() => _ActorAnimationsTabState();
+}
+
+class _ActorAnimationsTabState extends State<ActorAnimationsTab> {
+  final List<ActorAnimationDef> list = [
+    ActorAnimationDef('Marche', asset2D: 'hero_walk.png', asset3D: 'HeroWalk.anim'),
+    ActorAnimationDef('Attaque', asset2D: 'hero_attack.png', asset3D: 'HeroAttack.anim'),
+  ];
+  final _nameCtrl = TextEditingController();
+  final _a2d = TextEditingController();
+  final _a3d = TextEditingController();
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _a2d.dispose();
+    _a3d.dispose();
+    super.dispose();
+  }
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: _pad(Card(
+            child: Column(
+              children: [
+                const _Subheader('Animations d\'acteur'),
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: list.length,
+                    itemBuilder: (_, i) {
+                      final a = list[i];
+                      return ListTile(
+                        leading: const Icon(Icons.directions_run),
+                        title: Text(a.name),
+                        subtitle: Text('2D : ${a.asset2D} — 3D : ${a.asset3D}'),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          )),
+        ),
+        Expanded(
+          child: _pad(Card(
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const _Subheader('Créer / éditer'),
+                  TextField(controller: _nameCtrl, decoration: const InputDecoration(labelText: 'Nom')),
+                  TextField(controller: _a2d, decoration: const InputDecoration(labelText: 'Asset 2D')),
+                  TextField(controller: _a3d, decoration: const InputDecoration(labelText: 'Asset 3D')),
+                  const SizedBox(height: 8),
+                  FilledButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        list.add(ActorAnimationDef(
+                          _nameCtrl.text.trim(),
+                          asset2D: _a2d.text.trim(),
+                          asset3D: _a3d.text.trim(),
+                        ));
+                        _nameCtrl.clear();
+                        _a2d.clear();
+                        _a3d.clear();
+                      });
+                    },
+                    icon: const Icon(Icons.save_outlined),
+                    label: const Text('Enregistrer l\'animation'),
+                  ),
+                ],
+              ),
+            ),
+          )),
+        ),
+      ],
+    );
+  }
+}
+
+class VfxAnimationsTab extends StatefulWidget {
+  const VfxAnimationsTab({super.key});
+  @override
+  State<VfxAnimationsTab> createState() => _VfxAnimationsTabState();
+}
+
+class _VfxAnimationsTabState extends State<VfxAnimationsTab> {
+  final List<VfxAnimationDef> list = [
+    VfxAnimationDef('Explosion', asset2D: 'explosion.pfx', asset3D: 'Explosion3D.vfx'),
+    VfxAnimationDef('Soin', asset2D: 'heal.pfx', asset3D: 'Heal3D.vfx'),
+  ];
+  final _nameCtrl = TextEditingController();
+  final _a2d = TextEditingController();
+  final _a3d = TextEditingController();
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _a2d.dispose();
+    _a3d.dispose();
+    super.dispose();
+  }
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: _pad(Card(
+            child: Column(
+              children: [
+                const _Subheader('Animations VFX'),
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: list.length,
+                    itemBuilder: (_, i) {
+                      final a = list[i];
+                      return ListTile(
+                        leading: const Icon(Icons.auto_awesome),
+                        title: Text(a.name),
+                        subtitle: Text('2D : ${a.asset2D} — 3D : ${a.asset3D}'),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          )),
+        ),
+        Expanded(
+          child: _pad(Card(
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const _Subheader('Créer / éditer'),
+                  TextField(controller: _nameCtrl, decoration: const InputDecoration(labelText: 'Nom')),
+                  TextField(controller: _a2d, decoration: const InputDecoration(labelText: 'Asset 2D')),
+                  TextField(controller: _a3d, decoration: const InputDecoration(labelText: 'Asset 3D')),
+                  const SizedBox(height: 8),
+                  FilledButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        list.add(VfxAnimationDef(
+                          _nameCtrl.text.trim(),
+                          asset2D: _a2d.text.trim(),
+                          asset3D: _a3d.text.trim(),
+                        ));
+                        _nameCtrl.clear();
+                        _a2d.clear();
+                        _a3d.clear();
+                      });
+                    },
+                    icon: const Icon(Icons.save_outlined),
+                    label: const Text('Enregistrer l\'animation'),
                   ),
                 ],
               ),
