@@ -69,6 +69,15 @@ class EntityDef {
         states = states ?? {};
 }
 
+/// Définit une classe de personnage avec description et statistiques de base.
+class ClassDef {
+  String name;
+  String description;
+  Map<String, double> baseStats;
+  ClassDef({required this.name, this.description = '', Map<String, double>? baseStats})
+      : baseStats = baseStats ?? {};
+}
+
 /// Point d'entrée de l'application.
 void main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -422,6 +431,7 @@ class _DatabaseWindowState extends State<DatabaseWindow> {
   Widget build(BuildContext context) {
     final tabs = <_DbTab>[
       _DbTab('Héros', Icons.person_outline, const ActorsTab()),
+      _DbTab('Classes', Icons.school_outlined, const ClassesTab()),
       _DbTab('Ennemis', Icons.android_outlined, const EnemiesTab()),
       _DbTab('Tilesets', Icons.grid_on_outlined, const TilesetsTab()),
       _DbTab('Objets', Icons.backpack_outlined, const ItemsTab()),
@@ -675,6 +685,160 @@ class _ActorEditorState extends State<_ActorEditor> {
               icon: const Icon(Icons.save_outlined),
               label: const Text('Enregistrer'),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// Classes
+class ClassesTab extends StatefulWidget {
+  const ClassesTab({super.key});
+  @override
+  State<ClassesTab> createState() => _ClassesTabState();
+}
+
+class _ClassesTabState extends State<ClassesTab> {
+  final Map<String, ClassDef> classes = {
+    'Guerrier': ClassDef(name: 'Guerrier', description: 'Spécialiste du combat rapproché', baseStats: {
+      'HP': 110,
+      'Atk': 10,
+      'Def': 8,
+    }),
+    'Mage': ClassDef(name: 'Mage', description: 'Maîtrise la magie', baseStats: {
+      'MP': 120,
+      'MAtk': 12,
+      'MDef': 9,
+    }),
+  };
+
+  String? selected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: Card(
+            margin: const EdgeInsets.all(12),
+            child: ListView(
+              children: classes.keys.map((name) {
+                final isSelected = name == selected;
+                return ListTile(
+                  title: Text(name),
+                  selected: isSelected,
+                  onTap: () => setState(() => selected = name),
+                );
+              }).toList(),
+            ),
+          ),
+        ),
+        Expanded(
+          flex: 2,
+          child: Card(
+            margin: const EdgeInsets.all(12),
+            child: selected == null
+                ? const Center(child: Text('Sélectionnez une classe pour éditer'))
+                : _ClassEditor(
+                    classDef: classes[selected]!,
+                    onChanged: () => setState(() {}),
+                  ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ClassEditor extends StatefulWidget {
+  final ClassDef classDef;
+  final VoidCallback onChanged;
+  const _ClassEditor({required this.classDef, required this.onChanged});
+  @override
+  State<_ClassEditor> createState() => _ClassEditorState();
+}
+
+class _ClassEditorState extends State<_ClassEditor> {
+  late final TextEditingController _descCtrl;
+  late final Map<String, TextEditingController> _statCtrls;
+
+  @override
+  void initState() {
+    super.initState();
+    _descCtrl = TextEditingController(text: widget.classDef.description);
+    _statCtrls = {
+      for (final e in widget.classDef.baseStats.entries)
+        e.key: TextEditingController(text: e.value.toString())
+    };
+  }
+
+  @override
+  void dispose() {
+    _descCtrl.dispose();
+    for (final c in _statCtrls.values) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(12),
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Classe : ${widget.classDef.name}',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _descCtrl,
+              decoration: const InputDecoration(labelText: 'Description', border: OutlineInputBorder()),
+              minLines: 2,
+              maxLines: 3,
+              onChanged: (v) {
+                widget.classDef.description = v;
+                widget.onChanged();
+              },
+            ),
+            const SizedBox(height: 16),
+            const Text('Statistiques de base:', style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 4),
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: widget.classDef.baseStats.keys.map((stat) {
+                final ctrl = _statCtrls[stat]!;
+                return SizedBox(
+                  width: 160,
+                  child: TextField(
+                    controller: ctrl,
+                    decoration: InputDecoration(
+                      labelText: stat,
+                      border: const OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                    keyboardType: TextInputType.number,
+                    onChanged: (v) {
+                      widget.classDef.baseStats[stat] = double.tryParse(v) ?? 0;
+                      widget.onChanged();
+                    },
+                  ),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 8),
+            FilledButton.icon(
+              onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Classe enregistrée')),
+                );
+              },
+              icon: const Icon(Icons.save_outlined),
+              label: const Text('Enregistrer'),
+            )
           ],
         ),
       ),
