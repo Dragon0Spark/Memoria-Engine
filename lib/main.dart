@@ -57,6 +57,25 @@ class VfxAnimationDef {
   VfxAnimationDef(this.name, {this.asset2D = '', this.asset3D = ''});
 }
 
+/// Définit une classe de personnage (statistiques de base).
+class ClassDef {
+  ClassDef(this.name, {Map<String, double>? baseStats, this.description = ''})
+      : baseStats = baseStats ?? {};
+  final String name;
+  String description;
+  final Map<String, double> baseStats;
+}
+
+/// Décrit un tileset avec listes d'assets 2D et 3D.
+class TilesetDef {
+  TilesetDef(this.name, {List<String>? assets2D, List<String>? assets3D})
+      : assets2D = assets2D ?? [],
+        assets3D = assets3D ?? [];
+  final String name;
+  final List<String> assets2D;
+  final List<String> assets3D;
+}
+
 /// Définit un personnage (héros ou ennemi) avec statistiques, résistances et états appliqués.
 class EntityDef {
   String name;
@@ -717,6 +736,7 @@ class _ClassesTabState extends State<ClassesTab> {
 
   @override
   Widget build(BuildContext context) {
+    final stats = ['HP', 'MP', 'Atk', 'Def', 'MAtk', 'MDef'];
     return Row(
       children: [
         Expanded(
@@ -742,6 +762,7 @@ class _ClassesTabState extends State<ClassesTab> {
                 ? const Center(child: Text('Sélectionnez une classe pour éditer'))
                 : _ClassEditor(
                     classDef: classes[selected]!,
+                    stats: stats,
                     onChanged: () => setState(() {}),
                   ),
           ),
@@ -753,8 +774,10 @@ class _ClassesTabState extends State<ClassesTab> {
 
 class _ClassEditor extends StatefulWidget {
   final ClassDef classDef;
+  final List<String> stats;
   final VoidCallback onChanged;
-  const _ClassEditor({required this.classDef, required this.onChanged});
+  const _ClassEditor(
+      {required this.classDef, required this.stats, required this.onChanged});
   @override
   State<_ClassEditor> createState() => _ClassEditorState();
 }
@@ -780,6 +803,17 @@ class _ClassEditorState extends State<_ClassEditor> {
       c.dispose();
     }
     super.dispose();
+  }
+
+
+  void _save() {
+    widget.classDef.baseStats.clear();
+    _controllers.forEach((k, c) {
+      widget.classDef.baseStats[k] = double.tryParse(c.text) ?? 0;
+    });
+    widget.onChanged();
+    ScaffoldMessenger.of(context)
+        .showSnackBar(const SnackBar(content: Text('Classe enregistrée')));
   }
 
   @override
@@ -935,11 +969,98 @@ class _EnemiesTabState extends State<EnemiesTab> {
 }
 
 // Tilesets (placeholders)
-class TilesetsTab extends StatelessWidget {
+class TilesetsTab extends StatefulWidget {
   const TilesetsTab({super.key});
   @override
+  State<TilesetsTab> createState() => _TilesetsTabState();
+}
+
+class _TilesetsTabState extends State<TilesetsTab> {
+  final List<TilesetDef> tilesets = [
+    TilesetDef('Forêt', assets2D: ['forest.png'], assets3D: ['forest.glb']),
+    TilesetDef('Donjon', assets2D: ['dungeon.png'], assets3D: ['dungeon.glb']),
+  ];
+  final _nameCtrl = TextEditingController();
+  final _a2dCtrl = TextEditingController();
+  final _a3dCtrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _a2dCtrl.dispose();
+    _a3dCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return const Center(child: Text('Éditeur de tilesets (à implémenter)'));
+    return Row(
+      children: [
+        Expanded(
+          child: _pad(Card(
+            child: Column(
+              children: [
+                const _Subheader('Tilesets'),
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: tilesets.length,
+                    itemBuilder: (_, i) {
+                      final t = tilesets[i];
+                      return ListTile(
+                        leading: const Icon(Icons.grid_on_outlined),
+                        title: Text(t.name),
+                        subtitle: Text('2D: ${t.assets2D.length} — 3D: ${t.assets3D.length}'),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          )),
+        ),
+        Expanded(
+          child: _pad(Card(
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const _Subheader('Créer / éditer'),
+                  TextField(controller: _nameCtrl, decoration: const InputDecoration(labelText: 'Nom')),
+                  TextField(controller: _a2dCtrl, decoration: const InputDecoration(labelText: 'Assets 2D (séparés par des virgules)')),
+                  TextField(controller: _a3dCtrl, decoration: const InputDecoration(labelText: 'Assets 3D (séparés par des virgules)')),
+                  const SizedBox(height: 8),
+                  FilledButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        tilesets.add(TilesetDef(
+                          _nameCtrl.text.trim(),
+                          assets2D: _a2dCtrl.text
+                              .split(',')
+                              .map((e) => e.trim())
+                              .where((e) => e.isNotEmpty)
+                              .toList(),
+                          assets3D: _a3dCtrl.text
+                              .split(',')
+                              .map((e) => e.trim())
+                              .where((e) => e.isNotEmpty)
+                              .toList(),
+                        ));
+                        _nameCtrl.clear();
+                        _a2dCtrl.clear();
+                        _a3dCtrl.clear();
+                      });
+                    },
+                    icon: const Icon(Icons.save_outlined),
+                    label: const Text('Enregistrer le tileset'),
+                  ),
+                ],
+              ),
+            ),
+          )),
+        ),
+      ],
+    );
   }
 }
 
