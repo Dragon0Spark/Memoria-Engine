@@ -88,6 +88,15 @@ class EntityDef {
         states = states ?? {};
 }
 
+/// Définit une classe de personnage avec description et statistiques de base.
+class ClassDef {
+  String name;
+  String description;
+  Map<String, double> baseStats;
+  ClassDef({required this.name, this.description = '', Map<String, double>? baseStats})
+      : baseStats = baseStats ?? {};
+}
+
 /// Point d'entrée de l'application.
 void main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -711,20 +720,20 @@ class ClassesTab extends StatefulWidget {
 
 class _ClassesTabState extends State<ClassesTab> {
   final Map<String, ClassDef> classes = {
-    'Guerrier': ClassDef('Guerrier', baseStats: {
+    'Guerrier': ClassDef(name: 'Guerrier', description: 'Spécialiste du combat rapproché', baseStats: {
       'HP': 110,
-      'MP': 20,
-      'Atk': 15,
-      'Def': 12,
+      'Atk': 10,
+      'Def': 8,
     }),
-    'Mage': ClassDef('Mage', baseStats: {
-      'HP': 80,
-      'MP': 150,
-      'Atk': 8,
-      'Def': 6,
+    'Mage': ClassDef(name: 'Mage', description: 'Maîtrise la magie', baseStats: {
+      'MP': 120,
+      'MAtk': 12,
+      'MDef': 9,
     }),
   };
+
   String? selected;
+
   @override
   Widget build(BuildContext context) {
     final stats = ['HP', 'MP', 'Atk', 'Def', 'MAtk', 'MDef'];
@@ -774,24 +783,28 @@ class _ClassEditor extends StatefulWidget {
 }
 
 class _ClassEditorState extends State<_ClassEditor> {
-  late final Map<String, TextEditingController> _controllers;
+  late final TextEditingController _descCtrl;
+  late final Map<String, TextEditingController> _statCtrls;
+
   @override
   void initState() {
     super.initState();
-    _controllers = {
-      for (final s in widget.stats)
-        s: TextEditingController(
-            text: widget.classDef.baseStats[s]?.toString() ?? '0')
+    _descCtrl = TextEditingController(text: widget.classDef.description);
+    _statCtrls = {
+      for (final e in widget.classDef.baseStats.entries)
+        e.key: TextEditingController(text: e.value.toString())
     };
   }
 
   @override
   void dispose() {
-    for (final c in _controllers.values) {
+    _descCtrl.dispose();
+    for (final c in _statCtrls.values) {
       c.dispose();
     }
     super.dispose();
   }
+
 
   void _save() {
     widget.classDef.baseStats.clear();
@@ -807,39 +820,61 @@ class _ClassEditorState extends State<_ClassEditor> {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.all(12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Classe : ${widget.classDef.name}',
-              style:
-                  const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: widget.stats.map((stat) {
-              final ctrl = _controllers[stat]!;
-              return SizedBox(
-                width: 160,
-                child: TextField(
-                  controller: ctrl,
-                  decoration: InputDecoration(
-                    labelText: stat,
-                    border: const OutlineInputBorder(),
-                    isDense: true,
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Classe : ${widget.classDef.name}',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _descCtrl,
+              decoration: const InputDecoration(labelText: 'Description', border: OutlineInputBorder()),
+              minLines: 2,
+              maxLines: 3,
+              onChanged: (v) {
+                widget.classDef.description = v;
+                widget.onChanged();
+              },
+            ),
+            const SizedBox(height: 16),
+            const Text('Statistiques de base:', style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 4),
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: widget.classDef.baseStats.keys.map((stat) {
+                final ctrl = _statCtrls[stat]!;
+                return SizedBox(
+                  width: 160,
+                  child: TextField(
+                    controller: ctrl,
+                    decoration: InputDecoration(
+                      labelText: stat,
+                      border: const OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                    keyboardType: TextInputType.number,
+                    onChanged: (v) {
+                      widget.classDef.baseStats[stat] = double.tryParse(v) ?? 0;
+                      widget.onChanged();
+                    },
                   ),
-                  keyboardType: TextInputType.number,
-                ),
-              );
-            }).toList(),
-          ),
-          const SizedBox(height: 8),
-          FilledButton.icon(
-            onPressed: _save,
-            icon: const Icon(Icons.save_outlined),
-            label: const Text('Enregistrer'),
-          ),
-        ],
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 8),
+            FilledButton.icon(
+              onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Classe enregistrée')),
+                );
+              },
+              icon: const Icon(Icons.save_outlined),
+              label: const Text('Enregistrer'),
+            )
+          ],
+        ),
       ),
     );
   }
