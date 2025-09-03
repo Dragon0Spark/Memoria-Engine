@@ -57,6 +57,25 @@ class VfxAnimationDef {
   VfxAnimationDef(this.name, {this.asset2D = '', this.asset3D = ''});
 }
 
+/// Définit une classe de personnage (statistiques de base).
+class ClassDef {
+  ClassDef(this.name, {Map<String, double>? baseStats, this.description = ''})
+      : baseStats = baseStats ?? {};
+  final String name;
+  String description;
+  final Map<String, double> baseStats;
+}
+
+/// Décrit un tileset avec listes d'assets 2D et 3D.
+class TilesetDef {
+  TilesetDef(this.name, {List<String>? assets2D, List<String>? assets3D})
+      : assets2D = assets2D ?? [],
+        assets3D = assets3D ?? [];
+  final String name;
+  final List<String> assets2D;
+  final List<String> assets3D;
+}
+
 /// Définit un personnage (héros ou ennemi) avec statistiques, résistances et états appliqués.
 class EntityDef {
   String name;
@@ -422,6 +441,7 @@ class _DatabaseWindowState extends State<DatabaseWindow> {
   Widget build(BuildContext context) {
     final tabs = <_DbTab>[
       _DbTab('Héros', Icons.person_outline, const ActorsTab()),
+      _DbTab('Classes', Icons.school_outlined, const ClassesTab()),
       _DbTab('Ennemis', Icons.android_outlined, const EnemiesTab()),
       _DbTab('Tilesets', Icons.grid_on_outlined, const TilesetsTab()),
       _DbTab('Objets', Icons.backpack_outlined, const ItemsTab()),
@@ -682,6 +702,149 @@ class _ActorEditorState extends State<_ActorEditor> {
   }
 }
 
+// Classes
+class ClassesTab extends StatefulWidget {
+  const ClassesTab({super.key});
+  @override
+  State<ClassesTab> createState() => _ClassesTabState();
+}
+
+class _ClassesTabState extends State<ClassesTab> {
+  final Map<String, ClassDef> classes = {
+    'Guerrier': ClassDef('Guerrier', baseStats: {
+      'HP': 110,
+      'MP': 20,
+      'Atk': 15,
+      'Def': 12,
+    }),
+    'Mage': ClassDef('Mage', baseStats: {
+      'HP': 80,
+      'MP': 150,
+      'Atk': 8,
+      'Def': 6,
+    }),
+  };
+  String? selected;
+  @override
+  Widget build(BuildContext context) {
+    final stats = ['HP', 'MP', 'Atk', 'Def', 'MAtk', 'MDef'];
+    return Row(
+      children: [
+        Expanded(
+          child: Card(
+            margin: const EdgeInsets.all(12),
+            child: ListView(
+              children: classes.keys.map((name) {
+                final isSelected = name == selected;
+                return ListTile(
+                  title: Text(name),
+                  selected: isSelected,
+                  onTap: () => setState(() => selected = name),
+                );
+              }).toList(),
+            ),
+          ),
+        ),
+        Expanded(
+          flex: 2,
+          child: Card(
+            margin: const EdgeInsets.all(12),
+            child: selected == null
+                ? const Center(child: Text('Sélectionnez une classe pour éditer'))
+                : _ClassEditor(
+                    classDef: classes[selected]!,
+                    stats: stats,
+                    onChanged: () => setState(() {}),
+                  ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ClassEditor extends StatefulWidget {
+  final ClassDef classDef;
+  final List<String> stats;
+  final VoidCallback onChanged;
+  const _ClassEditor(
+      {required this.classDef, required this.stats, required this.onChanged});
+  @override
+  State<_ClassEditor> createState() => _ClassEditorState();
+}
+
+class _ClassEditorState extends State<_ClassEditor> {
+  late final Map<String, TextEditingController> _controllers;
+  @override
+  void initState() {
+    super.initState();
+    _controllers = {
+      for (final s in widget.stats)
+        s: TextEditingController(
+            text: widget.classDef.baseStats[s]?.toString() ?? '0')
+    };
+  }
+
+  @override
+  void dispose() {
+    for (final c in _controllers.values) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  void _save() {
+    widget.classDef.baseStats.clear();
+    _controllers.forEach((k, c) {
+      widget.classDef.baseStats[k] = double.tryParse(c.text) ?? 0;
+    });
+    widget.onChanged();
+    ScaffoldMessenger.of(context)
+        .showSnackBar(const SnackBar(content: Text('Classe enregistrée')));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Classe : ${widget.classDef.name}',
+              style:
+                  const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: widget.stats.map((stat) {
+              final ctrl = _controllers[stat]!;
+              return SizedBox(
+                width: 160,
+                child: TextField(
+                  controller: ctrl,
+                  decoration: InputDecoration(
+                    labelText: stat,
+                    border: const OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                  keyboardType: TextInputType.number,
+                ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 8),
+          FilledButton.icon(
+            onPressed: _save,
+            icon: const Icon(Icons.save_outlined),
+            label: const Text('Enregistrer'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 // Ennemis
 class EnemiesTab extends StatefulWidget {
   const EnemiesTab({super.key});
@@ -771,11 +934,98 @@ class _EnemiesTabState extends State<EnemiesTab> {
 }
 
 // Tilesets (placeholders)
-class TilesetsTab extends StatelessWidget {
+class TilesetsTab extends StatefulWidget {
   const TilesetsTab({super.key});
   @override
+  State<TilesetsTab> createState() => _TilesetsTabState();
+}
+
+class _TilesetsTabState extends State<TilesetsTab> {
+  final List<TilesetDef> tilesets = [
+    TilesetDef('Forêt', assets2D: ['forest.png'], assets3D: ['forest.glb']),
+    TilesetDef('Donjon', assets2D: ['dungeon.png'], assets3D: ['dungeon.glb']),
+  ];
+  final _nameCtrl = TextEditingController();
+  final _a2dCtrl = TextEditingController();
+  final _a3dCtrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _a2dCtrl.dispose();
+    _a3dCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return const Center(child: Text('Éditeur de tilesets (à implémenter)'));
+    return Row(
+      children: [
+        Expanded(
+          child: _pad(Card(
+            child: Column(
+              children: [
+                const _Subheader('Tilesets'),
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: tilesets.length,
+                    itemBuilder: (_, i) {
+                      final t = tilesets[i];
+                      return ListTile(
+                        leading: const Icon(Icons.grid_on_outlined),
+                        title: Text(t.name),
+                        subtitle: Text('2D: ${t.assets2D.length} — 3D: ${t.assets3D.length}'),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          )),
+        ),
+        Expanded(
+          child: _pad(Card(
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const _Subheader('Créer / éditer'),
+                  TextField(controller: _nameCtrl, decoration: const InputDecoration(labelText: 'Nom')),
+                  TextField(controller: _a2dCtrl, decoration: const InputDecoration(labelText: 'Assets 2D (séparés par des virgules)')),
+                  TextField(controller: _a3dCtrl, decoration: const InputDecoration(labelText: 'Assets 3D (séparés par des virgules)')),
+                  const SizedBox(height: 8),
+                  FilledButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        tilesets.add(TilesetDef(
+                          _nameCtrl.text.trim(),
+                          assets2D: _a2dCtrl.text
+                              .split(',')
+                              .map((e) => e.trim())
+                              .where((e) => e.isNotEmpty)
+                              .toList(),
+                          assets3D: _a3dCtrl.text
+                              .split(',')
+                              .map((e) => e.trim())
+                              .where((e) => e.isNotEmpty)
+                              .toList(),
+                        ));
+                        _nameCtrl.clear();
+                        _a2dCtrl.clear();
+                        _a3dCtrl.clear();
+                      });
+                    },
+                    icon: const Icon(Icons.save_outlined),
+                    label: const Text('Enregistrer le tileset'),
+                  ),
+                ],
+              ),
+            ),
+          )),
+        ),
+      ],
+    );
   }
 }
 
