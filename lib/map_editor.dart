@@ -218,6 +218,16 @@ class _MapEditorPageState extends State<MapEditorPage> {
     );
   }
 
+  Widget _toggle(String label, bool value, ValueChanged<bool> onChanged) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(label, style: const TextStyle(color: Colors.white)),
+        Switch(value: value, onChanged: onChanged),
+      ],
+    );
+  }
+
   Widget _buildPalette() {
     final entries = palette.entries.toList()..sort((a, b) => a.key.compareTo(b.key));
     return SizedBox(
