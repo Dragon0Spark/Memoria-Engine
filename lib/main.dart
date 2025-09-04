@@ -59,15 +59,6 @@ class VfxAnimationDef {
   VfxAnimationDef(this.name, {this.asset2D = '', this.asset3D = ''});
 }
 
-/// Définit une classe de personnage (statistiques de base).
-class ClassDef {
-  ClassDef(this.name, {Map<String, double>? baseStats, this.description = ''})
-      : baseStats = baseStats ?? {};
-  final String name;
-  String description;
-  final Map<String, double> baseStats;
-}
-
 /// Décrit un tileset avec listes d'assets 2D et 3D.
 class TilesetDef {
   TilesetDef(this.name, {List<String>? assets2D, List<String>? assets3D})
@@ -783,7 +774,7 @@ class _ClassEditorState extends State<_ClassEditor> {
 
   void _save() {
     widget.classDef.baseStats.clear();
-    _controllers.forEach((k, c) {
+    _statCtrls.forEach((k, c) {
       widget.classDef.baseStats[k] = double.tryParse(c.text) ?? 0;
     });
     widget.onChanged();

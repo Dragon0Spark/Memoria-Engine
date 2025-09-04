@@ -19,7 +19,7 @@ assets/ : tilesets, sprites, modèles 3D, VFX.
 
 data/ : fichier(s) de base de données (héros, classes, …).
 
-2. Base de données façon RPG Maker VX Ace
+2. Base de données façon RPG Maker classique
 Schéma général
 
 heroes.json, classes.json, skills.json, items.json, weapons.json, armors.json, enemies.json, troops.json, states.json, animations.json…
@@ -34,7 +34,7 @@ Panneau central : propriétés éditables (texte, nombres, combo-box, etc.).
 
 Panneau droit (optionnel) : aperçu des sprites, notes, etc.
 
-Boutons : nouveau, copier, supprimer, définir max, etc., comme dans VX Ace.
+Boutons : nouveau, copier, supprimer, définir max, etc., comme dans les éditeurs classiques.
 
 Notes / scripts : zone de texte libre pour stocker des extensions ou tags personnalisés (type <ruby>=value</ruby>).
 
@@ -119,7 +119,7 @@ Script / plugin system (ex. dart:ffi ou lua via luajit) pour customiser.
 Options de build : Windows, macOS, Linux, Web, Android, iOS.
 
 7. Plan de développement
-Étape 1 : Base de données minimale (héros, classes, items) + UI type VX Ace.
+Étape 1 : Base de données minimale (héros, classes, items) + interface inspirée des RPG Maker.
 
 Étape 2 : Map Editor 2D + gestion de tilesets/tiles.
 
@@ -132,6 +132,6 @@ Options de build : Windows, macOS, Linux, Web, Android, iOS.
 Étape 6 : Export runtime + script plugin.
 
 Conclusion
-En résumé, l’éditeur à la VX Ace peut être construit autour d’une base de données JSON/YAML, d’une interface Flutter calquée sur la disposition (liste + propriétés + notes), et d’un moteur de rendu capable de 2D, 2,5D et 3D. Les tilesets deviennent une bibliothèque d’assets 2D/3D, tandis que les animations se séparent en mouvements (Actor) et effets (VFX).
+En résumé, l’éditeur peut être construit autour d’une base de données JSON/YAML, d’une interface Flutter calquée sur la disposition (liste + propriétés + notes), et d’un moteur de rendu capable de 2D, 2,5D et 3D. Les tilesets deviennent une bibliothèque d’assets 2D/3D, tandis que les animations se séparent en mouvements (Actor) et effets (VFX).
 
 Ce plan t’offre une vue d’ensemble pour structurer ton projet Memoria Engine, afin de reproduire l’expérience RPG Maker tout en l’étendant vers la 2,5D et la 3D. N’hésite pas à subdiviser les étapes pour chaque release ou commit et à itérer progressivement.

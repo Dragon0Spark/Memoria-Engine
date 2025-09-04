@@ -356,10 +356,10 @@ class _MapEditorPageState extends State<MapEditorPage> {
       if (layer.data[y][x] != target) continue;
       layer.data[y][x] = selectedTileId;
       stack.addAll([
-        Offset(x - 1, y),
-        Offset(x + 1, y),
-        Offset(x, y - 1),
-        Offset(x, y + 1),
+        Offset((x - 1).toDouble(), y.toDouble()),
+        Offset((x + 1).toDouble(), y.toDouble()),
+        Offset(x.toDouble(), (y - 1).toDouble()),
+        Offset(x.toDouble(), (y + 1).toDouble()),
       ]);
     }
   }

@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import '../database.dart';
 
 /// Simple database editor with tabs for heroes, classes and database entries
-/// similar to RPG Maker VX Ace.
+/// similar to classic RPG editors.
 class DatabaseEditor extends StatefulWidget {
   const DatabaseEditor({super.key});
 
