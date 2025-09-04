@@ -1,6 +1,6 @@
 # Memoria Engine
 
-Prototype d'éditeur inspiré de RPG Maker VX Ace développé avec Flutter.
+Prototype d'éditeur de RPG développé avec Flutter.
 
 ## Caractéristiques
 

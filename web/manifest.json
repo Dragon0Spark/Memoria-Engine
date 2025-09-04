@@ -1,6 +1,6 @@
 {
-    "name": "memoria_editor_vxace_ui",
-    "short_name": "memoria_editor_vxace_ui",
+    "name": "memoria_editor_custom",
+    "short_name": "memoria_editor_custom",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
