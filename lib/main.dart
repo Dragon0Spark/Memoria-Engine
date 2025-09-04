@@ -1,15 +1,17 @@
 // ignore_for_file: prefer_const_constructors, avoid_print
 
 import 'dart:convert';
-import 'dart:io' show Platform;
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:desktop_multi_window/desktop_multi_window.dart' as dmw;
 import 'map_editor.dart';
 import 'models.dart';
+import 'map_storage.dart';
 import 'scene_editor.dart';
 import 'runtime.dart';
+import 'editor/database_editor.dart';
 
 // CameraMode is now defined in models.dart
 
@@ -205,7 +207,15 @@ class _MainWindowState extends State<MainWindow> {
    String? pendingAssetToPlace;
 
    MapData _ensureMapData(String name) {
-     return _mapNameToData.putIfAbsent(name, () => MapData(name: name, width: 50, height: 30));
+     return _mapNameToData.putIfAbsent(name, () {
+       final file = File('data/maps/\$name.json');
+       if (file.existsSync()) {
+         try {
+           return MapStorage.load(file.path);
+         } catch (_) {}
+       }
+       return MapData(name: name, width: 50, height: 30);
+     });
    }
 
    SceneData _ensureSceneData(String name) {
@@ -448,42 +458,7 @@ class DatabaseWindow extends StatefulWidget {
 class _DatabaseWindowState extends State<DatabaseWindow> {
   @override
   Widget build(BuildContext context) {
-    final tabs = <_DbTab>[
-      _DbTab('Héros', Icons.person_outline, const ActorsTab()),
-      _DbTab('Classes', Icons.school_outlined, const ClassesTab()),
-      _DbTab('Ennemis', Icons.android_outlined, const EnemiesTab()),
-      _DbTab('Tilesets', Icons.grid_on_outlined, const TilesetsTab()),
-      _DbTab('Objets', Icons.backpack_outlined, const ItemsTab()),
-      _DbTab('Compétences', Icons.auto_fix_high_outlined, const SkillsTab()),
-      _DbTab('États', Icons.healing_outlined, const StatesTab()),
-      _DbTab('Système', Icons.settings_outlined, const SystemTab()),
-      _DbTab('Stats', Icons.bar_chart, const StatsDesignerTab()),
-      _DbTab('Projectiles', Icons.bolt_outlined, const ProjectilesTab()),
-      _DbTab('Anim. Acteur', Icons.directions_run, const ActorAnimationsTab()),
-      _DbTab('Anim. VFX', Icons.auto_awesome, const VfxAnimationsTab()),
-      _DbTab('Template', Icons.file_copy_outlined, const TemplateTab()),
-    ];
-    return DefaultTabController(
-      length: tabs.length,
-      child: Scaffold(
-        appBar: PreferredSize(
-          preferredSize: const Size.fromHeight(88),
-          child: Column(
-            children: [
-              const _BlueHudBar(title: 'Base de données'),
-              Container(
-                color: const Color(0xFF165A9A),
-                child: TabBar(
-                  isScrollable: true,
-                  tabs: [for (final t in tabs) Tab(text: t.label, icon: Icon(t.icon))],
-                ),
-              ),
-            ],
-          ),
-        ),
-        body: TabBarView(children: [for (final t in tabs) t.page]),
-      ),
-    );
+    return const DatabaseEditor();
   }
 }
 

@@ -1,0 +1,4 @@
+[
+  {"id": 1, "name": "Warrior", "baseStats": {"HP": 30, "MP": 10}},
+  {"id": 2, "name": "Mage", "baseStats": {"HP": 20, "MP": 30}}
+]

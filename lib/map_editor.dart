@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'event_editor.dart';
 import 'models.dart';
+import 'map_storage.dart';
 
 enum MapTool { pencil, rectangle, fill, eraser, event }
 
@@ -142,6 +143,17 @@ class _MapEditorPageState extends State<MapEditorPage> {
           _toggle('D', showLayersD, (v) => setState(() => showLayersD = v)),
           _toggle('Evts', showEvents, (v) => setState(() => showEvents = v)),
           const Spacer(),
+          TextButton.icon(
+            onPressed: () {
+              MapStorage.save('data/maps/\${map.name}.json', map);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Carte sauvegardée')),
+              );
+            },
+            icon: const Icon(Icons.save_outlined, color: Colors.white),
+            label: const Text('Sauver', style: TextStyle(color: Colors.white)),
+          ),
+          const SizedBox(width: 8),
           TextButton.icon(
             onPressed: () {
               setState(() {
