@@ -154,6 +154,7 @@ class SceneObject {
     required this.kind,
     required this.x,
     required this.y,
+    this.z = 0,
     this.asset = '',
     Map<String, dynamic>? props,
   }) : props = props ?? <String, dynamic>{};
@@ -163,6 +164,7 @@ class SceneObject {
   SceneObjectKind kind;
   int x;
   int y;
+  int z;
   String asset;
   final Map<String, dynamic> props;
 }

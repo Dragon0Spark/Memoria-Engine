@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'models.dart';
 
 class SceneEditorPage extends StatefulWidget {
@@ -30,46 +31,162 @@ class _SceneEditorPageState extends State<SceneEditorPage> {
   int? dragStartObjX;
   int? dragStartObjY;
 
+  // 3D camera parameters
+  double camX = 0;
+  double camY = 10;
+  double camZ = 20;
+  double camYaw = math.pi;
+  double camPitch = -math.pi / 6;
+  final FocusNode _focusNode = FocusNode();
+  Size? _lastCanvasSize;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.cameraMode == CameraMode.threeD) {
+      _focusNode.requestFocus();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant SceneEditorPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.cameraMode == CameraMode.threeD && !_focusNode.hasFocus) {
+      _focusNode.requestFocus();
+    }
+  }
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final scene = widget.scene;
     final map = widget.mapData;
-    final Size canvasSize = _computeCanvasSize(map.width, map.height, widget.cameraMode);
+    final Size canvasSize =
+        _computeCanvasSize(map.width, map.height, widget.cameraMode);
+    _lastCanvasSize = canvasSize;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _buildToolbar(),
-        Expanded(
-          child: Scrollbar(
-            child: SingleChildScrollView(
-              scrollDirection: Axis.vertical,
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTapDown: (details) => _onTap(details.localPosition),
-                  onPanStart: (details) => _onPanStart(details.localPosition),
-                  onPanUpdate: (details) => _onPanUpdate(details.localPosition),
-                  onPanEnd: (_) => _onPanEnd(),
-                  child: CustomPaint(
-                    size: canvasSize,
-                    painter: _ScenePainter(
-                      mapWidth: map.width,
-                      mapHeight: map.height,
-                      tileSize: tileSize,
-                      objects: scene.objects,
-                      selectedObjectId: selectedObjectId,
-                      cameraMode: widget.cameraMode,
-                    ),
-                  ),
-                ),
+        Expanded(child: _buildViewport(scene, map, canvasSize)),
+      ],
+    );
+  }
+
+  Widget _buildViewport(SceneData scene, MapData map, Size canvasSize) {
+    if (widget.cameraMode == CameraMode.threeD) {
+      return Focus(
+        focusNode: _focusNode,
+        onKey: _handleKey,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTapDown: (details) => _onTap(details.localPosition),
+          onPanUpdate: (details) => _onPanRotate3D(details.delta),
+          child: CustomPaint(
+            size: canvasSize,
+            painter: _ScenePainter(
+              mapWidth: map.width,
+              mapHeight: map.height,
+              tileSize: tileSize,
+              objects: scene.objects,
+              selectedObjectId: selectedObjectId,
+              cameraMode: widget.cameraMode,
+              camX: camX,
+              camY: camY,
+              camZ: camZ,
+              camYaw: camYaw,
+              camPitch: camPitch,
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Scrollbar(
+      child: SingleChildScrollView(
+        scrollDirection: Axis.vertical,
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTapDown: (details) => _onTap(details.localPosition),
+            onPanStart: (details) => _onPanStart(details.localPosition),
+            onPanUpdate: (details) => _onPanUpdate(details.localPosition),
+            onPanEnd: (_) => _onPanEnd(),
+            child: CustomPaint(
+              size: canvasSize,
+              painter: _ScenePainter(
+                mapWidth: map.width,
+                mapHeight: map.height,
+                tileSize: tileSize,
+                objects: scene.objects,
+                selectedObjectId: selectedObjectId,
+                cameraMode: widget.cameraMode,
               ),
             ),
           ),
         ),
-      ],
+      ),
     );
+  }
+
+  KeyEventResult _handleKey(FocusNode node, RawKeyEvent event) {
+    if (event is! RawKeyDownEvent) return KeyEventResult.ignored;
+    const double step = 1.0;
+    switch (event.logicalKey) {
+      case LogicalKeyboardKey.keyW:
+        camX += math.sin(camYaw) * step;
+        camZ -= math.cos(camYaw) * step;
+        break;
+      case LogicalKeyboardKey.keyS:
+        camX -= math.sin(camYaw) * step;
+        camZ += math.cos(camYaw) * step;
+        break;
+      case LogicalKeyboardKey.keyA:
+        camX -= math.cos(camYaw) * step;
+        camZ -= math.sin(camYaw) * step;
+        break;
+      case LogicalKeyboardKey.keyD:
+        camX += math.cos(camYaw) * step;
+        camZ += math.sin(camYaw) * step;
+        break;
+      case LogicalKeyboardKey.space:
+        camY += step;
+        break;
+      case LogicalKeyboardKey.shiftLeft:
+        camY -= step;
+        break;
+      case LogicalKeyboardKey.arrowLeft:
+        camYaw -= 0.1;
+        break;
+      case LogicalKeyboardKey.arrowRight:
+        camYaw += 0.1;
+        break;
+      case LogicalKeyboardKey.arrowUp:
+        camPitch += 0.1;
+        break;
+      case LogicalKeyboardKey.arrowDown:
+        camPitch -= 0.1;
+        break;
+      default:
+        return KeyEventResult.ignored;
+    }
+    setState(() {});
+    return KeyEventResult.handled;
+  }
+
+  void _onPanRotate3D(Offset delta) {
+    setState(() {
+      camYaw += delta.dx * 0.01;
+      camPitch =
+          (camPitch + delta.dy * 0.01).clamp(-math.pi / 2 + 0.01, math.pi / 2 - 0.01);
+    });
   }
 
   Size _computeCanvasSize(int w, int h, CameraMode mode) {
@@ -80,7 +197,9 @@ class _SceneEditorPageState extends State<SceneEditorPage> {
       final height = (w + h) * (tileH / 2) + tileH * 3;
       return Size(width, height);
     }
-    // 2D and 3D fallback to a planar canvas
+    if (mode == CameraMode.threeD) {
+      return const Size(800, 600);
+    }
     return Size(w * tileSize, h * tileSize);
   }
 
@@ -113,7 +232,17 @@ class _SceneEditorPageState extends State<SceneEditorPage> {
     final grid = _pixelToGrid(localPos);
 
     if (widget.pendingAssetName != null) {
-      final newObj = _createObjectFromAsset(widget.pendingAssetName!, grid.dx.toInt(), grid.dy.toInt());
+      final SceneObject newObj;
+      if (widget.cameraMode == CameraMode.threeD) {
+        newObj = _createObjectFromAsset(
+            widget.pendingAssetName!, grid.dx.toInt(), grid.dy.toInt(), 0);
+      } else {
+        newObj = _createObjectFromAsset(
+            widget.pendingAssetName!, grid.dx.toInt(), grid.dy.toInt());
+      }
+      if (!_canPlaceObject(newObj.kind, widget.cameraMode)) {
+        return;
+      }
       setState(() {
         widget.scene.objects.add(newObj);
         selectedObjectId = newObj.id;
@@ -166,9 +295,46 @@ class _SceneEditorPageState extends State<SceneEditorPage> {
       final gy = (p.dy / tileSize).floor().toDouble();
       return Offset(gx, gy);
     }
+    if (widget.cameraMode == CameraMode.threeD && _lastCanvasSize != null) {
+      final width = _lastCanvasSize!.width;
+      final height = _lastCanvasSize!.height;
+      const double fov = 200.0;
+      final double x = p.dx - width / 2;
+      final double y = p.dy - height / 2;
+      final double nx = x / fov;
+      final double ny = y / fov;
+      double rx = nx;
+      double ry = ny;
+      double rz = 1.0;
+      final cy = math.cos(camYaw);
+      final sy = math.sin(camYaw);
+      final cp = math.cos(camPitch);
+      final sp = math.sin(camPitch);
+      final ryp = ry * cp + rz * sp;
+      final rzp = -ry * sp + rz * cp;
+      final rxx = rx * cy + rzp * sy;
+      final rzz = -rx * sy + rzp * cy;
+      final ryy = ryp;
+      final t = -camY / ryy;
+      final gx = camX + rxx * t;
+      final gz = camZ + rzz * t;
+      return Offset(gx, gz);
+    }
     final gx = (p.dx / tileSize).floor().toDouble();
     final gy = (p.dy / tileSize).floor().toDouble();
     return Offset(gx, gy);
+  }
+
+  bool _canPlaceObject(SceneObjectKind kind, CameraMode mode) {
+    switch (mode) {
+      case CameraMode.twoD:
+        return kind == SceneObjectKind.model3D;
+      case CameraMode.twoPointFiveD:
+        return kind == SceneObjectKind.sprite2D ||
+            kind == SceneObjectKind.model3D;
+      case CameraMode.threeD:
+        return true;
+    }
   }
 
   SceneObject? _findTopmostObjectAt(int x, int y) {
@@ -179,7 +345,8 @@ class _SceneEditorPageState extends State<SceneEditorPage> {
     return null;
   }
 
-  SceneObject _createObjectFromAsset(String assetName, int x, int y) {
+  SceneObject _createObjectFromAsset(String assetName, int x, int y,
+      [int z = 0]) {
     final kind = _inferKindFromAsset(assetName);
     return SceneObject(
       id: '${DateTime.now().microsecondsSinceEpoch}_${math.Random().nextInt(9999)}',
@@ -187,6 +354,7 @@ class _SceneEditorPageState extends State<SceneEditorPage> {
       kind: kind,
       x: x,
       y: y,
+      z: z,
       asset: assetName,
     );
   }
@@ -208,6 +376,11 @@ class _ScenePainter extends CustomPainter {
     required this.objects,
     required this.selectedObjectId,
     required this.cameraMode,
+    this.camX = 0,
+    this.camY = 10,
+    this.camZ = 10,
+    this.camYaw = 0,
+    this.camPitch = 0,
   });
 
   final int mapWidth;
@@ -216,12 +389,22 @@ class _ScenePainter extends CustomPainter {
   final List<SceneObject> objects;
   final String? selectedObjectId;
   final CameraMode cameraMode;
+  final double camX;
+  final double camY;
+  final double camZ;
+  final double camYaw;
+  final double camPitch;
 
   @override
   void paint(Canvas canvas, Size size) {
     _paintBackground(canvas, size);
-    _paintGrid(canvas, size);
-    _paintObjects(canvas);
+    if (cameraMode == CameraMode.threeD) {
+      _paintGrid3D(canvas, size);
+      _paintObjects3D(canvas, size);
+    } else {
+      _paintGrid(canvas, size);
+      _paintObjects(canvas);
+    }
   }
 
   void _paintBackground(Canvas canvas, Size size) {
@@ -276,30 +459,17 @@ class _ScenePainter extends CustomPainter {
       return;
     }
 
-    // Pseudo-3D: draw a faint perspective-like grid using iso projection as a stand-in
-    final double tileW = tileSize * 2.4;
-    final double tileH = tileSize * 1.2;
-    final originX = (mapHeight * (tileW / 2)) + tileW;
-    final originY = tileH * 1.5;
-    final stroke = Paint()
-      ..color = Colors.white24
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1;
-    for (int y = 0; y < mapHeight; y++) {
-      for (int x = 0; x < mapWidth; x++) {
-        final center = _isoProject(x, y, tileW, tileH, originX, originY);
-        final rect = Rect.fromCenter(center: center, width: tileW, height: tileH);
-        canvas.drawRRect(RRect.fromRectAndRadius(rect, const Radius.circular(3)), stroke);
-      }
-    }
+    // no grid for other modes here
   }
 
   void _paintObjects(Canvas canvas) {
     if (cameraMode == CameraMode.twoD) {
       for (final o in objects) {
-        final rect = Rect.fromLTWH(o.x * tileSize, o.y * tileSize, tileSize, tileSize);
+        final rect = Rect.fromLTWH(
+            o.x * tileSize, o.y * tileSize, tileSize, tileSize);
         final color = _colorFor(o);
-        final rrect = RRect.fromRectAndRadius(rect.deflate(3), const Radius.circular(4));
+        final rrect =
+            RRect.fromRectAndRadius(rect.deflate(3), const Radius.circular(4));
         canvas.drawRRect(rrect, Paint()..color = color);
         if (o.id == selectedObjectId) {
           canvas.drawRRect(rrect, Paint()
@@ -337,26 +507,57 @@ class _ScenePainter extends CustomPainter {
       }
       return;
     }
+  }
 
-    // Pseudo-3D: draw a small vertical extrusion
-    final double tileW = tileSize * 2.4;
-    final double tileH = tileSize * 1.2;
-    final originX = (mapHeight * (tileW / 2)) + tileW;
-    final originY = tileH * 1.5;
-    for (final o in drawList) {
-      final base = _isoProject(o.x, o.y, tileW, tileH, originX, originY);
-      final top = base.translate(0, -tileSize * 0.8);
+  void _paintGrid3D(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white24
+      ..style = PaintingStyle.stroke;
+    for (int x = 0; x <= mapWidth; x++) {
+      final p1 = _project3D(x.toDouble(), 0, 0, size);
+      final p2 = _project3D(x.toDouble(), 0, mapHeight.toDouble(), size);
+      canvas.drawLine(p1, p2, paint);
+    }
+    for (int z = 0; z <= mapHeight; z++) {
+      final p1 = _project3D(0, 0, z.toDouble(), size);
+      final p2 = _project3D(mapWidth.toDouble(), 0, z.toDouble(), size);
+      canvas.drawLine(p1, p2, paint);
+    }
+  }
+
+  void _paintObjects3D(Canvas canvas, Size size) {
+    for (final o in objects) {
+      final pos = _project3D(
+          o.x.toDouble(), o.z.toDouble(), o.y.toDouble(), size);
       final paint = Paint()..color = _colorFor(o).withOpacity(0.95);
-      // draw column
-      canvas.drawLine(base, top, Paint()
-        ..color = paint.color
-        ..strokeWidth = 6
-        ..strokeCap = StrokeCap.round);
-      // highlight selection
+      canvas.drawCircle(pos, 6, paint);
       if (o.id == selectedObjectId) {
-        canvas.drawCircle(top, 6, Paint()..color = Colors.yellowAccent);
+        canvas.drawCircle(pos, 8, Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2
+          ..color = Colors.yellowAccent);
       }
     }
+  }
+
+  Offset _project3D(
+      double wx, double wy, double wz, Size size) {
+    final dx = wx - camX;
+    final dy = wy - camY;
+    final dz = wz - camZ;
+    final cy = math.cos(camYaw);
+    final sy = math.sin(camYaw);
+    final cp = math.cos(camPitch);
+    final sp = math.sin(camPitch);
+    final xz = dx * cy - dz * sy;
+    final zz = dx * sy + dz * cy;
+    final yz = dy * cp - zz * sp;
+    final zz2 = dy * sp + zz * cp;
+    const double fov = 200.0;
+    final scale = fov / (fov + zz2);
+    final sx = xz * scale * tileSize + size.width / 2;
+    final sy = yz * scale * tileSize + size.height / 2;
+    return Offset(sx, sy);
   }
 
   Offset _isoProject(int x, int y, double tileW, double tileH, double originX, double originY) {
@@ -387,6 +588,11 @@ class _ScenePainter extends CustomPainter {
         oldDelegate.selectedObjectId != selectedObjectId ||
         oldDelegate.mapWidth != mapWidth ||
         oldDelegate.mapHeight != mapHeight ||
-        oldDelegate.cameraMode != cameraMode;
+        oldDelegate.cameraMode != cameraMode ||
+        oldDelegate.camX != camX ||
+        oldDelegate.camY != camY ||
+        oldDelegate.camZ != camZ ||
+        oldDelegate.camYaw != camYaw ||
+        oldDelegate.camPitch != camPitch;
   }
 }
