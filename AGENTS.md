@@ -19,7 +19,7 @@ assets/ : tilesets, sprites, modèles 3D, VFX.
 
 data/ : fichier(s) de base de données (héros, classes, …).
 
-2. Base de données façon RPG Maker classique
+2. Base de données façon RPG Maker VX Ace classique
 Schéma général
 
 heroes.json, classes.json, skills.json, items.json, weapons.json, armors.json, enemies.json, troops.json, states.json, animations.json…

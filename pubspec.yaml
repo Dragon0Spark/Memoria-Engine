@@ -1,4 +1,4 @@
-name: memoria_editor_custom
+name: memoria_engine
 description: Jeu d'édition 2D/2.5D/3D (éditeur de jeu) sans références externes.
 publish_to: "none"
 
